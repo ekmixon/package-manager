@@ -19,18 +19,11 @@ try:
     import git
     import semantic_version as semver # lgtm[py/unused-import]
 except ImportError as error:
-    print("error: zkg failed to import one or more dependencies:\n"
-          "\n"
-          "* GitPython:        https://pypi.org/project/GitPython\n"
-          "* semantic-version: https://pypi.org/project/semantic-version\n"
-          "\n"
-          "If you use 'pip', they can be installed like:\n"
-          "\n"
-          "     pip3 install GitPython semantic-version\n"
-          "\n"
-          "Also check the following exception output for possible alternate explanations:\n\n"
-          "{}: {}".format(type(error).__name__, error),
-          file=sys.stderr)
+    print(
+        f"error: zkg failed to import one or more dependencies:\n\n* GitPython:        https://pypi.org/project/GitPython\n* semantic-version: https://pypi.org/project/semantic-version\n\nIf you use 'pip', they can be installed like:\n\n     pip3 install GitPython semantic-version\n\nAlso check the following exception output for possible alternate explanations:\n\n{type(error).__name__}: {error}",
+        file=sys.stderr,
+    )
+
     sys.exit(1)
 
 # For Zeek-bundled installation, prepend the Python path of the Zeek
@@ -98,19 +91,14 @@ import zeekpkg
 def confirmation_prompt(prompt, default_to_yes=True):
     yes = {'y', 'ye', 'yes'}
 
-    if default_to_yes:
-        prompt += ' [Y/n] '
-    else:
-        prompt += ' [N/y] '
-
+    prompt += ' [Y/n] ' if default_to_yes else ' [N/y] '
     choice = input(prompt).lower()
 
     if not choice:
         if default_to_yes:
             return True
-        else:
-            print('Abort.')
-            return False
+        print('Abort.')
+        return False
 
     if choice in yes:
         return True
@@ -149,7 +137,7 @@ def prompt_for_user_vars(manager, config, configfile, args, pkg_infos):
             with io.open(configfile, 'w', encoding=std_encoding(sys.stdout)) as f:
                 config.write(f)
 
-            print('Saved answers to config file: {}'.format(configfile))
+            print(f'Saved answers to config file: {configfile}')
 
     manager.user_vars = answers
 
@@ -173,11 +161,7 @@ def find_configfile(args):
     if args.user:
         configfile = os.path.join(home_config_dir(), 'config')
 
-        if file_is_not_empty(configfile):
-            return configfile
-
-        return None
-
+        return configfile if file_is_not_empty(configfile) else None
     configfile = os.environ.get('ZKG_CONFIG_FILE')
 
     if not configfile:
@@ -194,10 +178,7 @@ def find_configfile(args):
 
     configfile = os.path.join(legacy_config_dir(), 'config')
 
-    if file_is_not_empty(configfile):
-        return configfile
-
-    return None
+    return configfile if file_is_not_empty(configfile) else None
 
 
 def home_config_dir():
@@ -259,11 +240,7 @@ def create_config(args, configfile):
 
         return default
 
-    if args.user:
-        def_state_dir = home_config_dir()
-    else:
-        def_state_dir = default_state_dir()
-
+    def_state_dir = home_config_dir() if args.user else default_state_dir()
     state_dir = get_option(config, 'paths', 'state_dir',
                            os.path.join(def_state_dir))
     script_dir = get_option(config, 'paths', 'script_dir',
@@ -353,10 +330,10 @@ def is_local_git_repo_dirty(git_url):
 def check_local_git_repo(git_url):
     if is_local_git_repo_url(git_url):
         if not is_local_git_repo(git_url):
-            print_error('error: path {} is not a git repository'.format(git_url))
+            print_error(f'error: path {git_url} is not a git repository')
             return False
         if is_local_git_repo_dirty(git_url):
-            print_error('error: local git clone at {} is dirty'.format(git_url))
+            print_error(f'error: local git clone at {git_url} is dirty')
             return False
 
     return True
@@ -369,9 +346,12 @@ def create_manager(args, config):
     bin_dir = config.get('paths', 'bin_dir')
     zeek_dist = config.get('paths', 'zeek_dist')
 
-    if state_dir == default_state_dir():
-        if not os.path.exists(state_dir) and os.path.exists(legacy_state_dir()):
-            make_symlink(legacy_state_dir(), state_dir)
+    if (
+        state_dir == default_state_dir()
+        and not os.path.exists(state_dir)
+        and os.path.exists(legacy_state_dir())
+    ):
+        make_symlink(legacy_state_dir(), state_dir)
 
     try:
         manager = zeekpkg.Manager(state_dir=state_dir, script_dir=script_dir,
@@ -453,7 +433,7 @@ def get_changed_state(manager, saved_state, pkg_lst):
         if not _ipkg or _ipkg.status.is_loaded == saved_state[_pkg_name]:
             continue
 
-        dep_listing += '  {}\n'.format(_pkg_name)
+        dep_listing += f'  {_pkg_name}\n'
 
     return dep_listing
 
@@ -484,7 +464,7 @@ def cmd_test(manager, args, config, configfile):
         if not check_local_git_repo(name):
             sys.exit(1)
 
-        version = args.version if args.version else active_git_branch(name)
+        version = args.version or active_git_branch(name)
         package_info = manager.info(name, version=version,
                                     prefer_installed=False)
 
@@ -545,7 +525,7 @@ def cmd_install(manager, args, config, configfile):
         if not check_local_git_repo(name):
             sys.exit(1)
 
-        version = args.version if args.version else active_git_branch(name)
+        version = args.version or active_git_branch(name)
         package_info = manager.info(name, version=version,
                                     prefer_installed=False)
 
@@ -579,7 +559,7 @@ def cmd_install(manager, args, config, configfile):
 
         for info, version, _ in sorted(package_infos, key=lambda x: x[0].package.name):
             name = info.package.qualified_name()
-            package_listing += '  {} ({})\n'.format(name, version)
+            package_listing += f'  {name} ({version})\n'
 
         print('The following packages will be INSTALLED:')
         print(package_listing)
@@ -589,8 +569,7 @@ def cmd_install(manager, args, config, configfile):
 
             for info, version, suggested in sorted(new_pkgs, key=lambda x: x[0].package.name):
                 name = info.package.qualified_name()
-                dependency_listing += '  {} ({})'.format(
-                    name, version)
+                dependency_listing += f'  {name} ({version})'
 
                 if suggested:
                     dependency_listing += ' (suggested)'
@@ -608,15 +587,14 @@ def cmd_install(manager, args, config, configfile):
             extdeps = info.dependencies(field='external_depends')
 
             if extdeps is None:
-                extdep_listing += '  from {} ({}):\n    <malformed>\n'.format(
-                    name, version)
+                extdep_listing += f'  from {name} ({version}):\n    <malformed>\n'
                 continue
 
             if extdeps:
-                extdep_listing += '  from {} ({}):\n'.format(name, version)
+                extdep_listing += f'  from {name} ({version}):\n'
 
                 for extdep, semver in sorted(extdeps.items()):
-                    extdep_listing += '    {} {}\n'.format(extdep, semver)
+                    extdep_listing += f'    {extdep} {semver}\n'
 
         if extdep_listing:
             print('Verify the following REQUIRED external dependencies:\n'
@@ -643,7 +621,7 @@ def cmd_install(manager, args, config, configfile):
                                  'no test_command in metadata', name)
                 continue
 
-            print('Running unit tests for "{}"'.format(name))
+            print(f'Running unit tests for "{name}"')
             error_msg = ''
             # For testing we always process dependencies, since the tests might
             # well fail without them. If the user wants --nodeps and the tests
@@ -663,7 +641,7 @@ def cmd_install(manager, args, config, configfile):
                                        name, test_dir, clone_dir)
 
             if error_msg:
-                print_error('error: {}'.format(error_msg))
+                print_error(f'error: {error_msg}')
 
                 if args.force:
                     continue
@@ -689,7 +667,7 @@ def cmd_install(manager, args, config, configfile):
 
         worker = InstallWorker(manager, name, version)
         worker.start()
-        print('Installing "{}"'.format(name), end='')
+        print(f'Installing "{name}"', end='')
         sys.stdout.flush()
 
         while True:
@@ -704,12 +682,12 @@ def cmd_install(manager, args, config, configfile):
         print('')
 
         if worker.error:
-            print('Failed installing "{}": {}'.format(name, worker.error))
+            print(f'Failed installing "{name}": {worker.error}')
             installs_failed.append((name, version))
             continue
 
         ipkg = manager.find_installed_package(name)
-        print('Installed "{}" ({})'.format(name, ipkg.status.current_version))
+        print(f'Installed "{name}" ({ipkg.status.current_version})')
 
         if is_overwriting:
             for i, mf in enumerate(modifications):
@@ -735,12 +713,10 @@ def cmd_install(manager, args, config, configfile):
                 print("\t\t" + backup_files[i])
 
         if manager.has_scripts(ipkg):
-            load_error = manager.load(name)
-
-            if load_error:
-                print('Failed loading "{}": {}'.format(name, load_error))
+            if load_error := manager.load(name):
+                print(f'Failed loading "{name}": {load_error}')
             else:
-                print('Loaded "{}"'.format(name))
+                print(f'Loaded "{name}"')
 
     if not args.nodeps:
         # Now load runtime dependencies after all dependencies and suggested
@@ -753,28 +729,27 @@ def cmd_install(manager, args, config, configfile):
 
             for _name, _error in load_error:
                 if not _error:
-                    _listing += '  {}\n'.format(_name)
+                    _listing += f'  {_name}\n'
 
-            if not _listing:
-                dep_listing = get_changed_state(manager, saved_state, [name])
+            if _listing:
+                print(
+                    f'The following installed packages could NOT be loaded to satisfy runtime dependencies for "{name}"'
+                )
 
-                if dep_listing:
-                    print('The following installed packages were additionally '
-                          'loaded to satisfy runtime dependencies')
-                    print(dep_listing)
-
-            else:
-                print('The following installed packages could NOT be loaded '
-                      'to satisfy runtime dependencies for "{}"'.format(name))
                 print(_listing)
                 manager.restore_loaded_package_states(saved_state)
+
+            elif dep_listing := get_changed_state(manager, saved_state, [name]):
+                print('The following installed packages were additionally '
+                      'loaded to satisfy runtime dependencies')
+                print(dep_listing)
 
     if installs_failed:
         print_error('error: incomplete installation, the follow packages'
                     ' failed to be installed:')
 
         for n, v in installs_failed:
-            print_error('  {} ({})'.format(n, v))
+            print_error(f'  {n} ({v})')
 
         sys.exit(1)
 

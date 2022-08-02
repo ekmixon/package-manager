@@ -16,8 +16,9 @@ def parser_navigate(parser_result, path, current_path=None):
         return parser_result
     if 'children' not in parser_result:
         raise NavigationException(
-            'Current parser have no children elements.  (path: %s)' %
-            ' '.join(current_path))
+            f"Current parser have no children elements.  (path: {' '.join(current_path)})"
+        )
+
     next_hop = path.pop(0)
     for child in parser_result['children']:
         # identifer is only used for aliased subcommands
@@ -26,8 +27,8 @@ def parser_navigate(parser_result, path, current_path=None):
             current_path.append(next_hop)
             return parser_navigate(child, path, current_path)
     raise NavigationException(
-        'Current parser have no children element with name: %s  (path: %s)' % (
-            next_hop, ' '.join(current_path)))
+        f"Current parser have no children element with name: {next_hop}  (path: {' '.join(current_path)})"
+    )
 
 
 def _try_add_parser_attribute(data, parser, attribname):
@@ -65,10 +66,7 @@ def parse_parser(parser, data=None, **kwargs):
         if isinstance(action, _HelpAction):
             continue
         if isinstance(action, _SubParsersAction):
-            helps = {}
-            for item in action._choices_actions:
-                helps[item.dest] = item.help
-
+            helps = {item.dest: item.help for item in action._choices_actions}
             # commands which share an existing parser are an alias,
             # don't duplicate docs
             subsection_alias = {}
@@ -84,14 +82,16 @@ def parse_parser(parser, data=None, **kwargs):
                 if name in subsection_alias_names:
                     continue
                 subalias = subsection_alias[subaction]
-                subaction.prog = '%s %s' % (parser.prog, name)
+                subaction.prog = f'{parser.prog} {name}'
                 subdata = {
-                    'name': name if not subalias else
-                            '%s (%s)' % (name, ', '.join(subalias)),
+                    'name': f"{name} ({', '.join(subalias)})"
+                    if subalias
+                    else name,
                     'help': helps.get(name, ''),
                     'usage': subaction.format_usage().strip(),
                     'bare_usage': _format_usage_without_prefix(subaction),
                 }
+
                 if subalias:
                     subdata['identifier'] = name
                 parse_parser(subaction, subdata, **kwargs)

@@ -102,8 +102,10 @@ class UserVar():
                 source = 'environment'
 
         if source:
-            print('"{}" will use value of "{}" ({}) from {}: {}'.format(
-                name, self._name, self._desc, source, val))
+            print(
+                f'"{name}" will use value of "{self._name}" ({self._desc}) from {source}: {val}'
+            )
+
             self._val = val
             return val
 
@@ -117,10 +119,9 @@ class UserVar():
             self._val = val
             return val
 
-        desc = ' (' + self._desc + ')' if self._desc else ''
-        print('"{}" requires a "{}" value{}: '.format(
-            name, self._name, desc))
-        self._val = _rlinput(self._name + ': ', val)
+        desc = f' ({self._desc})' if self._desc else ''
+        print(f'"{name}" requires a "{self._name}" value{desc}: ')
+        self._val = _rlinput(f'{self._name}: ', val)
 
         return self._val
 
@@ -131,8 +132,9 @@ class UserVar():
             name, val = arg.split('=', 1)
             return UserVar(name, val=val)
         except ValueError as error:
-            raise ValueError('invalid user var argument "{}", must be NAME=VAR'
-                             .format(arg)) from error
+            raise ValueError(
+                f'invalid user var argument "{arg}", must be NAME=VAR'
+            ) from error
 
     @staticmethod
     def parse_dict(metadata_dict):
