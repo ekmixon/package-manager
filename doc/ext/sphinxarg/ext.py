@@ -27,7 +27,7 @@ def map_nested_definitions(nested_content):
         for subitem in item:
             if not isinstance(subitem, nodes.definition_list_item):
                 continue
-            if not len(subitem.children) > 0:
+            if len(subitem.children) <= 0:
                 continue
             classifier = '@after'
             idx = subitem.first_child_matching_class(nodes.classifier)
@@ -37,7 +37,7 @@ def map_nested_definitions(nested_content):
                     classifier = ci.children[0].astext()
             if classifier is not None and classifier not in (
                     '@replace', '@before', '@after'):
-                raise Exception('Unknown classifier: %s' % classifier)
+                raise Exception(f'Unknown classifier: {classifier}')
             idx = subitem.first_child_matching_class(nodes.term)
             if idx is not None:
                 ch = subitem[idx]
@@ -62,8 +62,12 @@ def print_arg_list(data, nested_content):
             if len(my_def) == 0:
                 my_def.append(nodes.paragraph(text='Undocumented'))
             if 'choices' in arg:
-                my_def.append(nodes.paragraph(
-                    text=('Possible choices: %s' % ', '.join([str(c) for c in arg['choices']]))))
+                my_def.append(
+                    nodes.paragraph(
+                        text=f"Possible choices: {', '.join([str(c) for c in arg['choices']])}"
+                    )
+                )
+
             argname = name
 
             if arg['metavar']:
@@ -95,8 +99,12 @@ def print_opt_list(data, nested_content):
             if len(my_def) == 0:
                 my_def.append(nodes.paragraph(text='Undocumented'))
             if 'choices' in opt:
-                my_def.append(nodes.paragraph(
-                    text=('Possible choices: %s' % ', '.join([str(c) for c in opt['choices']]))))
+                my_def.append(
+                    nodes.paragraph(
+                        text=f"Possible choices: {', '.join([str(c) for c in opt['choices']])}"
+                    )
+                )
+
             items.append(
                 nodes.option_list_item(
                     '', nodes.option_group('', *names),
@@ -131,7 +139,7 @@ def apply_definition(definitions, my_def, name):
             return my_def + definition.children
         if classifier == '@before':
             return definition.children + my_def
-        raise Exception('Unknown classifier: %s' % classifier)
+        raise Exception(f'Unknown classifier: {classifier}')
     return my_def
 
 
@@ -282,7 +290,7 @@ class ArgParseDirective(Directive):
             for name in opt['name']:
                 option_declaration = [nodes.option_string(text=name)]
                 if opt['default'] is not None \
-                        and opt['default'] != '==SUPPRESS==':
+                            and opt['default'] != '==SUPPRESS==':
                     option_declaration += nodes.option_argument(
                         '', text='=' + str(opt['default']))
                 names.append(nodes.option('', *option_declaration))
@@ -328,7 +336,7 @@ class ArgParseDirective(Directive):
             attr_name = self.options['func']
         elif 'ref' in self.options:
             _parts = self.options['ref'].split('.')
-            module_name = '.'.join(_parts[0:-1])
+            module_name = '.'.join(_parts[:-1])
             attr_name = _parts[-1]
         else:
             raise self.error(
@@ -378,11 +386,12 @@ class ArgParseDirective(Directive):
         self.state.nested_parse(
             self.content, self.content_offset, nested_content)
         nested_content = nested_content.children
-        items = []
-        # add common content between
-        for item in nested_content:
-            if not isinstance(item, nodes.definition_list):
-                items.append(item)
+        items = [
+            item
+            for item in nested_content
+            if not isinstance(item, nodes.definition_list)
+        ]
+
         if 'description' in result:
             items.append(self._nested_parse_paragraph(result['description']))
         items.append(nodes.literal_block(text=result['usage']))

@@ -130,23 +130,19 @@ class Template():
                 if repo is None:
                     repo = git_clone(template, templatedir)
             except git.exc.GitCommandError as error:
-                msg = 'failed to update template "{}": {}'.format(template, error)
+                msg = f'failed to update template "{template}": {error}'
                 LOG.error(msg)
                 raise GitError(msg) from error
 
             if version is None:
                 version_tags = git_version_tags(repo)
 
-                if len(version_tags):
-                    version = version_tags[-1]
-                else:
-                    version = git_default_branch(repo)
-
+                version = version_tags[-1] if len(version_tags) else git_default_branch(repo)
             try:
                 git_checkout(repo, version)
             except git.exc.GitCommandError as error:
-                msg = 'failed to checkout branch/version "{}" of template {}: {}'.format(
-                    version, template, error)
+                msg = f'failed to checkout branch/version "{version}" of template {template}: {error}'
+
                 LOG.warn(msg)
                 raise GitError(msg) from error
 
@@ -160,21 +156,20 @@ class Template():
             except TypeError:
                 pass # Not on a branch, do nothing
             except git.exc.GitCommandError as error:
-                msg = 'failed to update branch "{}" of template {}: {}'.format(
-                    version, template, error)
+                msg = f'failed to update branch "{version}" of template {template}: {error}'
                 LOG.warning(msg)
                 raise GitError(msg) from error
 
         try:
             mod = load_source(os.path.join(templatedir, '__init__.py'))
         except Exception as error:
-            msg = 'failed to load template "{}": {}'.format(template, error)
+            msg = f'failed to load template "{template}": {error}'
             LOG.exception(msg)
             raise LoadError(msg) from error
 
         if not hasattr(mod, 'TEMPLATE_API_VERSION'):
-            msg = 'template{} does not indicate its API version'.format(
-                ' version ' + version if version else '')
+            msg = f"template{f' version {version}' if version else ''} does not indicate its API version"
+
             LOG.error(msg)
             raise LoadError(msg)
 
@@ -186,13 +181,11 @@ class Template():
         try:
             is_compat = Template.is_api_compatible(mod.TEMPLATE_API_VERSION)
         except ValueError:
-            raise LoadError('API version string "{}" is invalid'.format(
-                mod.TEMPLATE_API_VERSION))
+            raise LoadError(f'API version string "{mod.TEMPLATE_API_VERSION}" is invalid')
 
         if not is_compat:
-            msg = 'template{} API version is incompatible with zkg ({} vs {})'.format(
-                ' version ' + version if version else '',
-                mod.TEMPLATE_API_VERSION, API_VERSION)
+            msg = f"template{f' version {version}' if version else ''} API version is incompatible with zkg ({mod.TEMPLATE_API_VERSION} vs {API_VERSION})"
+
             LOG.error(msg)
             raise LoadError(msg)
 
@@ -224,12 +217,7 @@ class Template():
             return False
 
         # Minor version of template can be no larger than ours.
-        if tmpl_sv.minor > api_sv.minor:
-            return False
-
-        # Patch level does not matter. If ours is less than the
-        # template's we're buggy, but the difference doesn't affect API.
-        return True
+        return tmpl_sv.minor <= api_sv.minor
 
     def __init__(self, templatedir, api_version, version=None, repo=None):
         """Creates a template.
@@ -655,7 +643,7 @@ class _Content(metaclass=abc.ABCMeta):
 
                 yield in_file, out_path, out_file, out_content
 
-    def _replace(self, tmpl, content): # pylint: disable=no-self-use
+    def _replace(self, tmpl, content):    # pylint: disable=no-self-use
         """Helper for content substitution.
 
         Args:
@@ -667,7 +655,7 @@ class _Content(metaclass=abc.ABCMeta):
             str or bytes after parameter substitution.
         """
         for name, val in tmpl.params().items():
-            pat = '@' + name + '@'
+            pat = f'@{name}@'
             if not isinstance(content, str):
                 pat = bytes(pat, 'ascii')
                 val = bytes(val, 'ascii')
@@ -754,24 +742,20 @@ class Package(_Content):
         if self._features:
             names = sorted(['"' + f.name() + '"' for f in self._features])
             if len(names) == 1:
-                features_info = ', with feature {}'.format(names[0])
+                features_info = f', with feature {names[0]}'
             else:
-                features_info = ', with features '
-                features_info += ', '.join(names[:-1])
-                features_info += ' and ' + names[-1]
+                features_info = ', with features ' + ', '.join(names[:-1])
+                features_info += f' and {names[-1]}'
 
         ver_info = tmpl.version()
         ver_sha = tmpl.version_sha()
 
         if ver_info is None:
-            if ver_sha:
-                ver_info = 'version ' + ver_sha[:8]
-            else:
-                ver_info = 'no versioning'
+            ver_info = f'version {ver_sha[:8]}' if ver_sha else 'no versioning'
         else:
-            ver_info = 'version ' + ver_info
+            ver_info = f'version {ver_info}'
             if ver_sha:
-                ver_info += ' (' + ver_sha[:8] + ')'
+                ver_info += f' ({ver_sha[:8]})'
 
         repo.index.commit("""Initial commit.
 

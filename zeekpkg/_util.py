@@ -30,10 +30,7 @@ def normalize_version_tag(tag):
     """Given version string "vX.Y.Z", returns "X.Y.Z".
     Returns other input strings unchanged.
     """
-    if len(tag) > 1 and tag[0] == 'v' and tag[1].isdigit():
-        return tag[1:]
-
-    return tag
+    return tag[1:] if len(tag) > 1 and tag[0] == 'v' and tag[1].isdigit() else tag
 
 
 def delete_path(path):
@@ -250,12 +247,28 @@ def is_sha1(s):
     if len(s) != 40:
         return False
 
-    for c in s:
-        if c not in {'a', 'b', 'c', 'd', 'e', 'f',
-                     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9'}:
-            return False
-
-    return True
+    return all(
+        c
+        in {
+            'a',
+            'b',
+            'c',
+            'd',
+            'e',
+            'f',
+            '0',
+            '1',
+            '2',
+            '3',
+            '4',
+            '5',
+            '6',
+            '7',
+            '8',
+            '9',
+        }
+        for c in s
+    )
 
 
 def is_exe(path):
@@ -323,7 +336,7 @@ def load_source(filename):
 
     # Naming here is unimportant, since we access members of the new
     # module via the returned instance.
-    loader = importlib.machinery.SourceFileLoader('template_' + dirname, absname)
+    loader = importlib.machinery.SourceFileLoader(f'template_{dirname}', absname)
     mod = types.ModuleType(loader.name)
     loader.exec_module(mod)
 
@@ -341,12 +354,4 @@ def configparser_section_dict(parser, section):
         dict: a dict with key/val entries corresponding to the requested
         section, or an empty dict if the given parser has no such section.
     """
-    res = {}
-
-    if not parser.has_section(section):
-        return {}
-
-    for key, val in parser.items(section):
-        res[key] = val
-
-    return res
+    return dict(parser.items(section)) if parser.has_section(section) else {}

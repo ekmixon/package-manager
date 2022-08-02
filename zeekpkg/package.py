@@ -37,14 +37,7 @@ def canonical_url(path):
 
 def is_valid_name(name):
     """Returns True if name is a valid package name, else False."""
-    if name != name.strip():
-        # Reject names with leading/trailing whitespace
-        return False
-
-    if name in ("package", "packages"):
-        return False
-
-    return True
+    return False if name != name.strip() else name not in ("package", "packages")
 
 
 def aliases(metadata_dict):
@@ -116,9 +109,8 @@ def dependencies(metadata_dict, field='depends'):
     number of values), then None is returned.
     """
     if field not in metadata_dict:
-        return dict()
+        return {}
 
-    rval = dict()
     depends = metadata_dict[field]
     parts = depends.split()
     keys = parts[::2]
@@ -127,11 +119,7 @@ def dependencies(metadata_dict, field='depends'):
     if len(keys) != len(values):
         return None
 
-    for i, k in enumerate(keys):
-        if i < len(values):
-            rval[k] = values[i]
-
-    return rval
+    return {k: values[i] for i, k in enumerate(keys) if i < len(values)}
 
 
 class InstalledPackage(object):
@@ -281,10 +269,7 @@ class PackageInfo(object):
         If the package has any git release tags, this returns the highest one,
         else it returns the default branch like 'main' or 'master'.
         """
-        if self.versions:
-            return self.versions[-1]
-
-        return self.default_branch
+        return self.versions[-1] if self.versions else self.default_branch
 
 
 class Package(object):
@@ -401,10 +386,7 @@ class Package(object):
         If the package has no source or sub-directory within the source, then
         just the package name is returned.
         """
-        if self.directory:
-            return '{}/{}'.format(self.directory, self.name)
-
-        return self.name
+        return f'{self.directory}/{self.name}' if self.directory else self.name
 
     def qualified_name(self):
         """Return the shortest name that qualifies/distinguishes the package.
@@ -414,8 +396,7 @@ class Package(object):
         git URL is returned.
         """
         if self.source:
-            return '{}/{}'.format(self.source,
-                                  self.name_with_source_directory())
+            return f'{self.source}/{self.name_with_source_directory()}'
 
         return self.git_url
 
@@ -427,19 +408,20 @@ class Package(object):
         """
         path_parts = path.split('/')
 
-        if self.source:
-            pkg_path = self.qualified_name()
-            pkg_path_parts = pkg_path.split('/')
+        if not self.source:
+            return (
+                True
+                if len(path_parts) == 1 and path_parts[-1] == self.name
+                else path == self.git_url
+            )
 
-            for i, part in reversed(list(enumerate(path_parts))):
-                ri = i - len(path_parts)
+        pkg_path = self.qualified_name()
+        pkg_path_parts = pkg_path.split('/')
 
-                if part != pkg_path_parts[ri]:
-                    return False
+        for i, part in reversed(list(enumerate(path_parts))):
+            ri = i - len(path_parts)
 
-            return True
-        else:
-            if len(path_parts) == 1 and path_parts[-1] == self.name:
-                return True
+            if part != pkg_path_parts[ri]:
+                return False
 
-            return path == self.git_url
+        return True

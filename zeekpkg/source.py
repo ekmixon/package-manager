@@ -110,9 +110,11 @@ class Source(object):
             except ValueError:
                 pass
 
-            for filename in files:
-                if filename == INDEX_FILENAME or filename == LEGACY_INDEX_FILENAME:
-                    rval.append(os.path.join(root, filename))
+            rval.extend(
+                os.path.join(root, filename)
+                for filename in files
+                if filename in [INDEX_FILENAME, LEGACY_INDEX_FILENAME]
+            )
 
         return sorted(rval)
 
@@ -139,8 +141,7 @@ class Source(object):
                 metadata = {}
 
                 if parser.has_section(agg_key):
-                    metadata = {key: value for key,
-                                value in parser.items(agg_key)}
+                    metadata = dict(parser.items(agg_key))
 
                 package = Package(git_url=url, source=self.name,
                                   directory=directory, metadata=metadata)

@@ -117,7 +117,7 @@ class Stage(object):
         zeekpath = os.environ.get('ZEEKPATH') or os.environ.get('BROPATH')
         pluginpath = os.environ.get('ZEEK_PLUGIN_PATH') or os.environ.get('BRO_PLUGIN_PATH')
 
-        if not (zeekpath and pluginpath):
+        if not zeekpath or not pluginpath:
             zeek_config = find_program('zeek-config')
             path_option = '--zeekpath'
 
@@ -125,22 +125,21 @@ class Stage(object):
                 zeek_config = find_program('bro-config')
                 path_option = '--bropath'
 
-            if zeek_config:
-                cmd = subprocess.Popen([zeek_config, path_option, '--plugin_dir'],
-                                       stdout=subprocess.PIPE,
-                                       stderr=subprocess.STDOUT,
-                                       bufsize=1, universal_newlines=True)
-                line1 = read_zeek_config_line(cmd.stdout)
-                line2 = read_zeek_config_line(cmd.stdout)
-
-                if not zeekpath:
-                    zeekpath = line1
-
-                if not pluginpath:
-                    pluginpath = line2
-            else:
+            if not zeek_config:
                 return None, 'no "zeek-config" or "bro-config" found in PATH'
 
+            cmd = subprocess.Popen([zeek_config, path_option, '--plugin_dir'],
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.STDOUT,
+                                   bufsize=1, universal_newlines=True)
+            line1 = read_zeek_config_line(cmd.stdout)
+            line2 = read_zeek_config_line(cmd.stdout)
+
+        if not zeekpath:
+            zeekpath = line1
+
+        if not pluginpath:
+            pluginpath = line2
         zeekpath = os.path.dirname(self.script_dir) + os.pathsep + zeekpath
         pluginpath = os.path.dirname(self.plugin_dir) + os.pathsep + pluginpath
 
@@ -378,7 +377,7 @@ class Manager(object):
 
             for ipkg in self.loaded_packages():
                 if self.has_scripts(ipkg):
-                    content += '@load ./{}\n'.format(ipkg.package.name)
+                    content += f'@load ./{ipkg.package.name}\n'
 
             f.write(content)
 
@@ -410,13 +409,12 @@ class Manager(object):
                 except OSError as exception:
                     LOG.warning('could not enable plugin: %s: %s'.format(
                         type(exception).__name__, exception))
-        else:
-            if os.path.exists(magic_path):
-                try:
-                    os.rename(magic_path, magic_path_disabled)
-                except OSError as exception:
-                    LOG.warning('could not disable plugin: %s: %s'.format(
-                        type(exception).__name__, exception))
+        elif os.path.exists(magic_path):
+            try:
+                os.rename(magic_path, magic_path_disabled)
+            except OSError as exception:
+                LOG.warning('could not disable plugin: %s: %s'.format(
+                    type(exception).__name__, exception))
 
     def _read_manifest(self):
         """Read the manifest file containing the list of installed packages.
@@ -454,11 +452,14 @@ class Manager(object):
         Raises:
             IOError: when the manifest file can't be written
         """
-        pkg_list = []
+        pkg_list = [
+            {
+                'package_dict': installed_pkg.package.__dict__,
+                'status_dict': installed_pkg.status.__dict__,
+            }
+            for _, installed_pkg in self.installed_pkgs.items()
+        ]
 
-        for _, installed_pkg in self.installed_pkgs.items():
-            pkg_list.append({'package_dict': installed_pkg.package.__dict__,
-                             'status_dict': installed_pkg.status.__dict__})
 
         data = {'manifest_version': 1, 'script_dir': self.script_dir,
                 'plugin_dir': self.plugin_dir, 'bin_dir': self.bin_dir,
@@ -518,8 +519,7 @@ class Manager(object):
                 LOG.debug('duplicate source "%s"', name)
                 return True
 
-            return 'source already exists with different URL: {}'.format(
-                existing_source.git_url)
+            return f'source already exists with different URL: {existing_source.git_url}'
 
         clone_path = os.path.join(self.source_clonedir, name)
 
@@ -582,13 +582,11 @@ class Manager(object):
 
     def loaded_packages(self):
         """Return list of loaded :class:`.package.InstalledPackage`."""
-        rval = []
-
-        for _, ipkg in sorted(self.installed_pkgs.items()):
-            if ipkg.status.is_loaded:
-                rval.append(ipkg)
-
-        return rval
+        return [
+            ipkg
+            for _, ipkg in sorted(self.installed_pkgs.items())
+            if ipkg.status.is_loaded
+        ]
 
     def package_build_log(self, pkg_path):
         """Return the path to the package manager's build log for a package.
@@ -601,7 +599,7 @@ class Manager(object):
                 to the package: "foo", "alice/foo", or "zeek/alice/foo".
         """
         name = name_from_path(pkg_path)
-        return os.path.join(self.log_dir, '{}-build.log'.format(name))
+        return os.path.join(self.log_dir, f'{name}-build.log')
 
     def match_source_packages(self, pkg_path):
         """Return a list of :class:`.package.Package` that match a given path.
@@ -613,14 +611,9 @@ class Manager(object):
                 :file:`alice/zkg.index`, the following inputs may refer
                 to the package: "foo", "alice/foo", or "zeek/alice/foo".
         """
-        rval = []
         canon_url = canonical_url(pkg_path)
 
-        for pkg in self.source_packages():
-            if pkg.matches_path(canon_url):
-                rval.append(pkg)
-
-        return rval
+        return [pkg for pkg in self.source_packages() if pkg.matches_path(canon_url)]
 
     def find_installed_package(self, pkg_path):
         """Return an :class:`.package.InstalledPackage` if one matches the name.
@@ -646,9 +639,7 @@ class Manager(object):
                 :file:`alice/zkg.index`, the following inputs may refer
                 to the package: "foo", "alice/foo", or "zeek/alice/foo".
         """
-        ipkg = self.find_installed_package(pkg_path)
-
-        if ipkg:
+        if ipkg := self.find_installed_package(pkg_path):
             return ipkg.package.dependencies()
 
         return None
